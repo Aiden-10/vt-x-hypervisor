@@ -29,4 +29,4 @@ Instruction-based exits can advance guest RIP using the VM-exit instruction leng
 
 ## Disclaimer
 
-This project was created for educational and systems research purposes. It is experimental kernel-level software and is not intended to be run on real hardware. Bugs may cause system crashes or data loss. Use only in a test environment or virtual machine with nested virtualization enabled, and at your own risk.
+This project is still in development and was created for educational and systems research purposes. It is experimental software and is not intended to be run on real hardware. Bugs may cause system crashes or data loss. Use only in a test environment or virtual machine with nested virtualization enabled, and at your own risk.
