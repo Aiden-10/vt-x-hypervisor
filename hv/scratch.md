@@ -1,0 +1,75 @@
+DriverEntry
+- check if cpu supports vmx cpu.ecx.b5 = 1
+- check if vmx is allowed by feature control CPUID.ECX[5]
+- allocate vmxon, vmcs, vmmstack, and msrbitmap regions
+- Call VCPU->start()
+
+VCPU->start()
+- Save cr0, cr3, cr4
+- prepare_control_registers_for_vmx
+	- cr0 fixed and cr4 fixed
+- call vmxon
+- call vmclear
+- call vmptrld
+- setup guest control registers
+	- write guest_cr0 = original cr0 with VMX fixed bits
+	- write guest_cr4 = original cr4 with VMX fixed bits
+	- write guest_cr3 = original cr3
+- setup guest descriptor tables
+	- read gdtr
+	- read idtr
+	- write gdtr/idtr base and limit
+- setup guest segments
+	- read gdtr
+	- decode es, cs, ss, ds, fs, gs, ldtr, tr
+	- write guest selector base limit and access rights for es, cs, ss, ds, fs, gs, ldtr, tr
+	- write GUEST_RFLAGS = __readeflags()
+	- write GUEST_IA32_EFER = __readmsr(intel::IA32_EFER)
+	- write GUEST_VMCS_LINK_POINTER = ~0ULL
+	- write GUEST_ACTIVITY_STATE = 0
+	- write GUEST_INTERRUPTIBILITY_STATE = 0
+	- write GUEST_PENDING_DEBUG_EXCEPTIONS = 0
+	- write GUEST_DR7 = __readdr(7)
+	- write GUEST_SYSENTER_CS = __readmsr(intel::IA32_SYSENTER_CS)
+	- write GUEST_SYSENTER_ESP = __readmsr(intel::IA32_SYSENTER_ESP)
+	- write GUEST_SYSENTER_EIP = __readmsr(intel::IA32_SYSENTER_EIP)
+- setup host registers
+	- write host_cr0 = __readcr0()
+	- write host_cr4 = __readcr4()
+	- write host_cr3 = __readcr3()
+	- write HOST_IA32_EFER = __readmsr(intel::IA32_EFER)
+- setup host descriptor tables
+	- read gdtr
+	- read idtr
+	- write gdtr/idtr base and limit
+- setup host segments
+	- read gdtr
+	- read es, cs, ss, ds, fs, gs, tr
+	- decode tr
+	- write es, cs, ss, ds, fs, gs, tr with & 0xF8
+	- write HOST_SYSENTER_CS = __readmsr(intel::IA32_SYSENTER_CS)
+	- write HOST_SYSENTER_ESP = __readmsr(intel::IA32_SYSENTER_ESP)
+	- write HOST_SYSENTER_EIP = __readmsr(intel::IA32_SYSENTER_EIP)
+- setup host execution state
+	- stacktop = vcpu->vmm_stack + VMM_STACK_SIZE (pagesize * 4)
+	- stack_top &= ~0xFULL;
+	- write HOST_RSP = stack_top
+	- write HOST_RIP = &vmexit_entry
+- setup controls execution
+	- pinbased_msr = se_true_controls ? intel::IA32_VMX_TRUE_PINBASED_CTLS : intel::IA32_VMX_PINBASED_CTLS;
+	- primary_msr = use_true_controls ? intel::IA32_VMX_TRUE_PROCBASED_CTLS : intel::IA32_VMX_PROCBASED_CTLS;
+	- primary requested = USE_MSR_BITMAPS
+	- write PIN_BASED_CONTROLS and PRIMARY_PROC_CONTROLS
+	- if USE_MSR_BITMAPS 
+		- write MSR_BITMAP = vcpu->msr_bitmap_physical.QuadPart
+- setup entry exit 
+	- exit_msr = use_true_controls ? intel::IA32_VMX_TRUE_EXIT_CTLS : intel::IA32_VMX_EXIT_CTLS;
+	- entry_msr = use_true_controls ? intel::IA32_VMX_TRUE_ENTRY_CTLS : intel::IA32_VMX_ENTRY_CTLS;
+	- exit_requested = vmx_controls::HOST_ADDRESS_SPACE_SIZE
+	- entry requested = vmx_controls::IA32E_MODE_GUEST
+	- write EXIT_CONTROLS and ENTRY_CONTROLS
+- vmlaunch
+	- when return from vmlaunch == 0
+		- Return to vmx::launch() caller
+	- when  return from vmlaunch != 0
+		- fail 
